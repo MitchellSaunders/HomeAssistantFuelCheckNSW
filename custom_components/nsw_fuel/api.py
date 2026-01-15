@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import base64
+import json
 import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from aiohttp import ClientSession
+from aiohttp.client_exceptions import ContentTypeError
 
 
 class NswFuelApi:
@@ -35,7 +37,10 @@ class NswFuelApi:
         params = {"grant_type": "client_credentials"}
         async with self._session.get(url, headers=headers, params=params) as resp:
             resp.raise_for_status()
-            payload = await resp.json()
+            try:
+                payload = await resp.json(content_type=None)
+            except ContentTypeError:
+                payload = json.loads(await resp.text())
         token = payload.get("access_token")
         expires_in = payload.get("expires_in")
         if not token:
@@ -93,16 +98,20 @@ class NswFuelApi:
         }
         headers = await self._headers()
         async with self._session.post(url, headers=headers, json=payload) as resp:
-            if resp.content_length == 0:
+            text = await resp.text()
+            if resp.status >= 400:
+                raise RuntimeError(f"{resp.status} {text}")
+            if not text:
                 return {"stations": [], "prices": []}
-            resp.raise_for_status()
-            return await resp.json()
+            return json.loads(text)
 
     async def get_station_prices(self, station_code: str) -> Dict[str, Any]:
         url = f"{self._base_url}/FuelPriceCheck/v1/fuel/prices/station/{station_code}"
         headers = await self._headers()
         async with self._session.get(url, headers=headers) as resp:
-            if resp.content_length == 0:
+            text = await resp.text()
+            if resp.status >= 400:
+                raise RuntimeError(f"{resp.status} {text}")
+            if not text:
                 return {"prices": []}
-            resp.raise_for_status()
-            return await resp.json()
+            return json.loads(text)

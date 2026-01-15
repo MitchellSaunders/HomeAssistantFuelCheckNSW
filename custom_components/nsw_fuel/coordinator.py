@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
 from .api import NswFuelApi
@@ -129,16 +129,19 @@ class NearbyCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
         for loc_id, loc in locations.items():
             best: Optional[Dict[str, Any]] = None
             for fuel in preferred_fuels:
-                payload = await self.api.get_prices_nearby(
-                    fueltype=fuel,
-                    brands=brands,
-                    namedlocation=loc.get("postal") or namedlocation,
-                    latitude=loc["lat"],
-                    longitude=loc["lon"],
-                    radius_km=radius_km,
-                    sortby="price",
-                    sortascending="true",
-                )
+                try:
+                    payload = await self.api.get_prices_nearby(
+                        fueltype=fuel,
+                        brands=brands,
+                        namedlocation=loc.get("postal") or namedlocation,
+                        latitude=loc["lat"],
+                        longitude=loc["lon"],
+                        radius_km=radius_km,
+                        sortby="price",
+                        sortascending="true",
+                    )
+                except Exception as err:
+                    raise UpdateFailed(f"Nearby request failed: {err}") from err
                 joined = _join_station_prices(payload)
                 cheapest = _pick_cheapest(joined)
                 if cheapest and (not best or cheapest["price"] < best["price"]):
@@ -169,7 +172,10 @@ class FavoriteStationCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
             return {}
         preferred_fuels = set(_split_pipe(self.entry.data[CONF_PREFERRED_FUELS]))
         checked_at = dt_util.utcnow().isoformat()
-        payload = await self.api.get_station_prices(station_code)
+        try:
+            payload = await self.api.get_station_prices(station_code)
+        except Exception as err:
+            raise UpdateFailed(f"Favorite station request failed: {err}") from err
         prices = [
             p for p in payload.get("prices", []) if p.get("fueltype") in preferred_fuels
         ]
