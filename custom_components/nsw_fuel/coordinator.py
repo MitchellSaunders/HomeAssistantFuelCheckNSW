@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
@@ -43,12 +44,19 @@ def _split_commas(value: Any) -> List[str]:
 def _get_entity_location(hass: HomeAssistant, entity_id: str) -> Optional[Dict[str, str]]:
     state = hass.states.get(entity_id)
     if not state:
-        _LOGGER.warning("Location entity missing: %s", entity_id)
+        registry = er.async_get(hass)
+        reg_entry = registry.async_get(entity_id)
+        if reg_entry:
+            _LOGGER.info("Location entity has no state yet: %s", entity_id)
+        else:
+            _LOGGER.warning("Location entity missing: %s", entity_id)
         return None
     attrs = state.attributes
 
     location = attrs.get("Location") or attrs.get("location")
-    if isinstance(location, str) and "," in location:
+    if isinstance(location, (list, tuple)) and len(location) >= 2:
+        lat_str, lon_str = str(location[0]).strip(), str(location[1]).strip()
+    elif isinstance(location, str) and "," in location:
         lat_str, lon_str = [v.strip() for v in location.split(",", 1)]
     else:
         lat_str = attrs.get("latitude") or attrs.get("Latitude")
