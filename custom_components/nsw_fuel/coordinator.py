@@ -43,6 +43,7 @@ def _split_commas(value: Any) -> List[str]:
 def _get_entity_location(hass: HomeAssistant, entity_id: str) -> Optional[Dict[str, str]]:
     state = hass.states.get(entity_id)
     if not state:
+        _LOGGER.warning("Location entity missing: %s", entity_id)
         return None
     attrs = state.attributes
 
@@ -61,6 +62,7 @@ def _get_entity_location(hass: HomeAssistant, entity_id: str) -> Optional[Dict[s
     )
 
     if not lat_str or not lon_str:
+        _LOGGER.warning("Location entity missing lat/lon: %s attrs=%s", entity_id, attrs)
         return None
     return {"lat": str(lat_str), "lon": str(lon_str), "postal": str(postal or "")}
 
@@ -145,12 +147,22 @@ class NearbyCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                         sortascending="true",
                     )
                 except Exception as err:
+                    _LOGGER.error("Nearby request failed for %s (%s): %s", loc_id, fuel, err)
                     raise UpdateFailed(f"Nearby request failed: {err}") from err
                 joined = _join_station_prices(payload)
                 cheapest = _pick_cheapest(joined)
                 if cheapest and (not best or cheapest["price"] < best["price"]):
                     best = cheapest
 
+            if not best:
+                _LOGGER.warning(
+                    "No prices found for %s (lat=%s lon=%s postal=%s fuels=%s)",
+                    loc_id,
+                    loc.get("lat"),
+                    loc.get("lon"),
+                    loc.get("postal"),
+                    preferred_fuels,
+                )
             results[loc_id] = {
                 "best": best,
                 "last_checked": checked_at,
@@ -173,12 +185,14 @@ class FavoriteStationCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
     async def _async_update_data(self) -> Dict[str, Any]:
         station_code = self.entry.data.get(CONF_FAVORITE_STATION_CODE, "")
         if not station_code:
+            _LOGGER.info("Favorite station code not configured; skipping update.")
             return {}
         preferred_fuels = set(_split_pipe(self.entry.data[CONF_PREFERRED_FUELS]))
         checked_at = dt_util.utcnow().isoformat()
         try:
             payload = await self.api.get_station_prices(station_code)
         except Exception as err:
+            _LOGGER.error("Favorite station request failed (%s): %s", station_code, err)
             raise UpdateFailed(f"Favorite station request failed: {err}") from err
         prices = [
             p for p in payload.get("prices", []) if p.get("fueltype") in preferred_fuels

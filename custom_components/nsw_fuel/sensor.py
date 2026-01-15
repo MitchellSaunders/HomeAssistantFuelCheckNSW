@@ -21,8 +21,10 @@ async def async_setup_entry(
 
     entities: List[SensorEntity] = []
     entities.append(NswFuelNearbySensor(nearby_coordinator, "home", "Home Cheapest"))
-    for entity_id in _split_commas(entry.data.get(CONF_PERSON_ENTITIES, "")):
-        entities.append(NswFuelNearbySensor(nearby_coordinator, entity_id, entity_id))
+    for idx, entity_id in enumerate(_split_commas(entry.data.get(CONF_PERSON_ENTITIES, "")), start=1):
+        entities.append(
+            NswFuelNearbySensor(nearby_coordinator, entity_id, f"User {idx} Nearby Cheapest")
+        )
 
     if entry.data.get(CONF_FAVORITE_STATION_CODE, ""):
         entities.append(NswFuelFavoriteStationSensor(favorite_coordinator))
