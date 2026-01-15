@@ -13,8 +13,8 @@ from homeassistant.util import dt as dt_util
 from .api import NswFuelApi
 from .const import (
     CONF_BRANDS,
-    CONF_FAVORITE_STATION_CODE,
-    CONF_FAVORITE_UPDATE_MINUTES,
+    CONF_FAVOURITE_STATION_CODE,
+    CONF_FAVOURITE_UPDATE_MINUTES,
     CONF_HOME_LAT,
     CONF_HOME_LON,
     CONF_HOME_NAMEDLOCATION,
@@ -22,7 +22,7 @@ from .const import (
     CONF_PERSON_ENTITIES,
     CONF_PREFERRED_FUELS,
     CONF_RADIUS_KM,
-    DEFAULT_FAVORITE_UPDATE_MINUTES,
+    DEFAULT_FAVOURITE_UPDATE_MINUTES,
     DEFAULT_NEARBY_UPDATE_MINUTES,
 )
 
@@ -92,9 +92,22 @@ def _join_station_prices(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "name": station.get("name"),
                 "address": station.get("address"),
                 "distance": location.get("distance"),
+                "latitude": location.get("latitude"),
+                "longitude": location.get("longitude"),
             }
         )
     return joined
+
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    from math import radians, sin, cos, asin, sqrt
+
+    r = 6371.0
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    c = 2 * asin(sqrt(a))
+    return r * c
 
 
 def _pick_cheapest(records: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
@@ -138,6 +151,7 @@ class NearbyCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                 locations[entity_id] = loc
 
         results: Dict[str, Any] = {}
+        home_best_coords: Optional[Dict[str, float]] = None
         checked_at = dt_util.utcnow().isoformat()
 
         for loc_id, loc in locations.items():
@@ -171,37 +185,60 @@ class NearbyCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                     loc.get("postal"),
                     preferred_fuels,
                 )
+            if loc_id == "home" and best:
+                try:
+                    home_best_coords = {
+                        "lat": float(best.get("latitude")),
+                        "lon": float(best.get("longitude")),
+                    }
+                except (TypeError, ValueError):
+                    _LOGGER.warning("Home cheapest station missing lat/lon: %s", best)
             results[loc_id] = {
                 "best": best,
                 "last_checked": checked_at,
             }
+
+        if home_best_coords:
+            for loc_id, loc in locations.items():
+                if loc_id == "home":
+                    continue
+                try:
+                    dist = _haversine_km(
+                        float(loc["lat"]),
+                        float(loc["lon"]),
+                        home_best_coords["lat"],
+                        home_best_coords["lon"],
+                    )
+                except (TypeError, ValueError):
+                    dist = None
+                results[loc_id]["distance_to_home_cheapest"] = dist
         return results
 
 
-class FavoriteStationCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
+class FavouriteStationCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, api: NswFuelApi) -> None:
-        interval = entry.data.get(CONF_FAVORITE_UPDATE_MINUTES, DEFAULT_FAVORITE_UPDATE_MINUTES)
+        interval = entry.data.get(CONF_FAVOURITE_UPDATE_MINUTES, DEFAULT_FAVOURITE_UPDATE_MINUTES)
         super().__init__(
             hass,
             logger=_LOGGER,
-            name="nsw_fuel_favorite_station",
+            name="nsw_fuel_favourite_station",
             update_interval=timedelta(minutes=interval),
         )
         self.api = api
         self.entry = entry
 
     async def _async_update_data(self) -> Dict[str, Any]:
-        station_code = self.entry.data.get(CONF_FAVORITE_STATION_CODE, "")
+        station_code = self.entry.data.get(CONF_FAVOURITE_STATION_CODE, "")
         if not station_code:
-            _LOGGER.info("Favorite station code not configured; skipping update.")
+            _LOGGER.info("Favourite station code not configured; skipping update.")
             return {}
         preferred_fuels = set(_split_pipe(self.entry.data[CONF_PREFERRED_FUELS]))
         checked_at = dt_util.utcnow().isoformat()
         try:
             payload = await self.api.get_station_prices(station_code)
         except Exception as err:
-            _LOGGER.error("Favorite station request failed (%s): %s", station_code, err)
-            raise UpdateFailed(f"Favorite station request failed: {err}") from err
+            _LOGGER.error("Favourite station request failed (%s): %s", station_code, err)
+            raise UpdateFailed(f"Favourite station request failed: {err}") from err
         prices = [
             p for p in payload.get("prices", []) if p.get("fueltype") in preferred_fuels
         ]

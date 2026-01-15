@@ -18,7 +18,7 @@ def main() -> None:
         base_url=base_url,
         api_key=os.environ.get("NSW_FUEL_API_KEY"),
         api_secret=os.environ.get("NSW_FUEL_API_SECRET"),
-        authorization=os.environ.get("NSW_FUEL_API_AUTHORIZATION"),
+        authorisation=os.environ.get("NSW_FUEL_API_AUTHORISATION"),
     )
     fueltype = os.environ.get("NSW_FUEL_API_FUELTYPE", "U91")
     brands_raw = os.environ.get("NSW_FUEL_API_BRANDS", "")

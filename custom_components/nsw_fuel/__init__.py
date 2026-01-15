@@ -5,17 +5,18 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.event import async_track_state_change
 
 from .api import NswFuelApi
 from .const import (
     CONF_API_KEY,
     CONF_API_SECRET,
-    CONF_FAVORITE_STATION_CODE,
+    CONF_FAVOURITE_STATION_CODE,
     CONF_PERSON_ENTITIES,
     DOMAIN,
     SERVICE_REFRESH,
 )
-from .coordinator import FavoriteStationCoordinator, NearbyCoordinator
+from .coordinator import FavouriteStationCoordinator, NearbyCoordinator
 
 PLATFORMS = ["sensor"]
 
@@ -35,19 +36,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     nearby_coordinator = NearbyCoordinator(hass, entry, api)
-    favorite_coordinator = FavoriteStationCoordinator(hass, entry, api)
+    favourite_coordinator = FavouriteStationCoordinator(hass, entry, api)
 
     try:
         await nearby_coordinator.async_config_entry_first_refresh()
-        if entry.data.get(CONF_FAVORITE_STATION_CODE, ""):
-            await favorite_coordinator.async_config_entry_first_refresh()
+        if entry.data.get(CONF_FAVOURITE_STATION_CODE, ""):
+            await favourite_coordinator.async_config_entry_first_refresh()
     except Exception as exc:
         raise ConfigEntryNotReady from exc
 
     hass.data[DOMAIN][entry.entry_id]["coordinators"] = {
         "nearby": nearby_coordinator,
-        "favorite": favorite_coordinator,
+        "favourite": favourite_coordinator,
     }
+    hass.data[DOMAIN][entry.entry_id]["unsub"] = []
+
+    person_entities = [
+        e.strip()
+        for e in entry.data.get(CONF_PERSON_ENTITIES, "").split(",")
+        if e.strip()
+    ]
+    if person_entities:
+        def _schedule_refresh(entity_id, old_state, new_state):
+            if new_state is None:
+                return
+            hass.async_create_task(nearby_coordinator.async_request_refresh())
+
+        for entity_id in person_entities:
+            unsub = async_track_state_change(hass, entity_id, _schedule_refresh)
+            hass.data[DOMAIN][entry.entry_id]["unsub"].append(unsub)
 
     async def _handle_refresh(call) -> None:
         coordinators = hass.data[DOMAIN][entry.entry_id].get("coordinators", {})
@@ -64,6 +81,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
+        for unsub in hass.data[DOMAIN][entry.entry_id].get("unsub", []):
+            unsub()
         hass.data[DOMAIN].pop(entry.entry_id, None)
     return unload_ok
 
@@ -74,7 +93,7 @@ def _migrate_entity_ids(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
     desired: dict[str, str] = {
         f"{DOMAIN}_home_nearby": "sensor.home_cheapest_fuel",
-        f"{DOMAIN}_favorite_station": "sensor.favorite_station_fuel",
+        f"{DOMAIN}_favourite_station": "sensor.favourite_station_fuel",
     }
     for idx, entity_id in enumerate(entry.data.get(CONF_PERSON_ENTITIES, "").split(","), start=1):
         entity_id = entity_id.strip()

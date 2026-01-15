@@ -8,8 +8,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import CONF_FAVORITE_STATION_CODE, CONF_PERSON_ENTITIES, DOMAIN
-from .coordinator import FavoriteStationCoordinator, NearbyCoordinator, _split_commas
+from .const import CONF_FAVOURITE_STATION_CODE, CONF_PERSON_ENTITIES, DOMAIN
+from .coordinator import FavouriteStationCoordinator, NearbyCoordinator, _split_commas
 
 
 async def async_setup_entry(
@@ -17,7 +17,7 @@ async def async_setup_entry(
 ) -> None:
     coordinators = hass.data[DOMAIN][entry.entry_id]["coordinators"]
     nearby_coordinator = coordinators["nearby"]
-    favorite_coordinator = coordinators["favorite"]
+    favourite_coordinator = coordinators["favourite"]
 
     entities: List[SensorEntity] = []
     entities.append(NswFuelNearbySensor(nearby_coordinator, "home", "Home Cheapest Fuel"))
@@ -28,8 +28,8 @@ async def async_setup_entry(
             )
         )
 
-    if entry.data.get(CONF_FAVORITE_STATION_CODE, ""):
-        entities.append(NswFuelFavoriteStationSensor(favorite_coordinator))
+    if entry.data.get(CONF_FAVOURITE_STATION_CODE, ""):
+        entities.append(NswFuelFavouriteStationSensor(favourite_coordinator))
 
     async_add_entities(entities)
 
@@ -61,20 +61,21 @@ class NswFuelNearbySensor(CoordinatorEntity, SensorEntity):
             "station_name": best.get("name"),
             "address": best.get("address"),
             "distance": best.get("distance"),
+            "distance_to_home_cheapest": data.get("distance_to_home_cheapest"),
             "last_checked": data.get("last_checked"),
             "last_changed": best.get("lastupdated"),
         }
 
 
-class NswFuelFavoriteStationSensor(CoordinatorEntity, SensorEntity):
+class NswFuelFavouriteStationSensor(CoordinatorEntity, SensorEntity):
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:gas-station"
 
-    def __init__(self, coordinator: FavoriteStationCoordinator) -> None:
+    def __init__(self, coordinator: FavouriteStationCoordinator) -> None:
         super().__init__(coordinator)
-        self._attr_name = "Favorite Station Fuel"
-        self._attr_unique_id = f"{DOMAIN}_favorite_station"
+        self._attr_name = "Favourite Station Fuel"
+        self._attr_unique_id = f"{DOMAIN}_favourite_station"
 
     @property
     def native_value(self) -> Optional[float]:

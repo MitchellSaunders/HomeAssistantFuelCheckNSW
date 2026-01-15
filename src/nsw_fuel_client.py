@@ -15,13 +15,13 @@ class NswFuelClient:
     base_url: str
     api_key: Optional[str] = None
     api_secret: Optional[str] = None
-    authorization: Optional[str] = None
+    authorisation: Optional[str] = None
     _token: Optional[str] = None
     _token_expiry: Optional[float] = None
 
     def _basic_auth_header(self) -> str:
-        if self.authorization:
-            return self.authorization
+        if self.authorisation:
+            return self.authorisation
         if not self.api_key or not self.api_secret:
             raise ValueError("Missing api_key/api_secret for token request.")
         raw = f"{self.api_key}:{self.api_secret}".encode("utf-8")

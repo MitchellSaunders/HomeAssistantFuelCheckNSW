@@ -48,9 +48,9 @@ action:
 mode: single
 ```
 
-Refresh favorite station 4x daily (6am/12pm/6pm/12am):
+Refresh favourite station 4x daily (6am/12pm/6pm/12am):
 ```yaml
-alias: Favorite Station Fuel - 4x Daily Refresh
+alias: Favourite Station Fuel - 4x Daily Refresh
 trigger:
   - platform: time
     at: "00:00:00"

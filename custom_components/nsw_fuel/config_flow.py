@@ -16,14 +16,14 @@ from .const import (
     CONF_BRANDS,
     CONF_PREFERRED_FUELS,
     CONF_PERSON_ENTITIES,
-    CONF_FAVORITE_STATION_CODE,
+    CONF_FAVOURITE_STATION_CODE,
     CONF_NEARBY_UPDATE_MINUTES,
-    CONF_FAVORITE_UPDATE_MINUTES,
+    CONF_FAVOURITE_UPDATE_MINUTES,
     DEFAULT_RADIUS_KM,
     DEFAULT_BRANDS,
     DEFAULT_PREFERRED_FUELS,
     DEFAULT_NEARBY_UPDATE_MINUTES,
-    DEFAULT_FAVORITE_UPDATE_MINUTES,
+    DEFAULT_FAVOURITE_UPDATE_MINUTES,
     DOMAIN,
 )
 
@@ -98,7 +98,7 @@ class NswFuelConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         multiple=True,
                     )
                 ),
-                vol.Optional(CONF_FAVORITE_STATION_CODE, default=""): selector.TextSelector(
+                vol.Optional(CONF_FAVOURITE_STATION_CODE, default=""): selector.TextSelector(
                     selector.TextSelectorConfig()
                 ),
                 vol.Optional(
@@ -107,7 +107,7 @@ class NswFuelConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     selector.NumberSelectorConfig(min=5, max=360, step=5, mode="box")
                 ),
                 vol.Optional(
-                    CONF_FAVORITE_UPDATE_MINUTES, default=DEFAULT_FAVORITE_UPDATE_MINUTES
+                    CONF_FAVOURITE_UPDATE_MINUTES, default=DEFAULT_FAVOURITE_UPDATE_MINUTES
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=60, max=1440, step=60, mode="box")
                 ),
