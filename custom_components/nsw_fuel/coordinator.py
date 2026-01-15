@@ -110,7 +110,11 @@ class NearbyCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
     async def _async_update_data(self) -> Dict[str, Any]:
         preferred_fuels = _split_pipe(self.entry.data[CONF_PREFERRED_FUELS])
         brands = _split_pipe(self.entry.data.get(CONF_BRANDS, ""))
-        radius_km = self.entry.data[CONF_RADIUS_KM]
+        radius_raw = self.entry.data[CONF_RADIUS_KM]
+        try:
+            radius_km = str(int(float(radius_raw)))
+        except (TypeError, ValueError):
+            radius_km = str(radius_raw)
         namedlocation = self.entry.data[CONF_HOME_NAMEDLOCATION]
         home_lat = self.entry.data[CONF_HOME_LAT]
         home_lon = self.entry.data[CONF_HOME_LON]
