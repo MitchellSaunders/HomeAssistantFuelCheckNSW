@@ -6,5 +6,6 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .DS_Store
+response_*.json
 response_1768444371876.json
 response_1768444371876.json
