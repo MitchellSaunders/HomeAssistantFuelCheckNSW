@@ -16,19 +16,15 @@ class NswFuelApi:
         base_url: str,
         api_key: str,
         api_secret: str,
-        authorization: Optional[str] = None,
     ) -> None:
         self._session = session
         self._base_url = base_url.rstrip("/")
         self._api_key = api_key
         self._api_secret = api_secret
-        self._authorization = authorization
         self._token: Optional[str] = None
         self._token_expiry: Optional[float] = None
 
     def _basic_auth_header(self) -> str:
-        if self._authorization:
-            return self._authorization
         raw = f"{self._api_key}:{self._api_secret}".encode("utf-8")
         encoded = base64.b64encode(raw).decode("ascii")
         return f"Basic {encoded}"

@@ -48,9 +48,9 @@ action:
 mode: single
 ```
 
-Refresh Costco 4x daily (6am/12pm/6pm/12am):
+Refresh favorite station 4x daily (6am/12pm/6pm/12am):
 ```yaml
-alias: Costco Fuel - 4x Daily Refresh
+alias: Favorite Station Fuel - 4x Daily Refresh
 trigger:
   - platform: time
     at: "00:00:00"

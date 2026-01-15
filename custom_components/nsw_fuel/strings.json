@@ -1,0 +1,15 @@
+{
+  "title": "NSW Fuel Prices",
+  "config": {
+    "step": {
+      "user": {
+        "title": "API credentials",
+        "description": "Enter your NSW Fuel API credentials."
+      },
+      "location": {
+        "title": "Locations and preferences",
+        "description": "Set your home location, optional people sensors, and fuel preferences."
+      }
+    }
+  }
+}

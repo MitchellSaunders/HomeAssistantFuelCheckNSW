@@ -16,7 +16,6 @@ from .api import NswFuelApi
 from .const import (
     CONF_API_KEY,
     CONF_API_SECRET,
-    CONF_AUTHORIZATION,
     CONF_HOME_NAMEDLOCATION,
     CONF_HOME_LAT,
     CONF_HOME_LON,
@@ -25,20 +24,26 @@ from .const import (
     CONF_PREFERRED_FUELS,
     CONF_PERSON_ENTITIES,
     CONF_COSTCO_STATION_CODE,
+    CONF_FAVORITE_STATION_CODE,
     CONF_NEARBY_UPDATE_MINUTES,
     CONF_COSTCO_UPDATE_MINUTES,
+    CONF_FAVORITE_UPDATE_MINUTES,
     DEFAULT_NEARBY_UPDATE_MINUTES,
     DEFAULT_COSTCO_UPDATE_MINUTES,
     DOMAIN,
 )
 
 
-def _split_pipe(value: str) -> List[str]:
-    return [v.strip() for v in value.split("|") if v.strip()]
+def _split_pipe(value: Any) -> List[str]:
+    if isinstance(value, list):
+        return [str(v).strip() for v in value if str(v).strip()]
+    return [v.strip() for v in str(value).split("|") if v.strip()]
 
 
-def _split_commas(value: str) -> List[str]:
-    return [v.strip() for v in value.split(",") if v.strip()]
+def _split_commas(value: Any) -> List[str]:
+    if isinstance(value, list):
+        return [str(v).strip() for v in value if str(v).strip()]
+    return [v.strip() for v in str(value).split(",") if v.strip()]
 
 
 def _get_entity_location(hass: HomeAssistant, entity_id: str) -> Optional[Dict[str, str]]:
@@ -152,20 +157,24 @@ class NearbyCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
         return results
 
 
-class CostcoCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
+class FavoriteStationCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, api: NswFuelApi) -> None:
-        interval = entry.data.get(CONF_COSTCO_UPDATE_MINUTES, DEFAULT_COSTCO_UPDATE_MINUTES)
+        interval = entry.data.get(CONF_FAVORITE_UPDATE_MINUTES) or entry.data.get(
+            CONF_COSTCO_UPDATE_MINUTES, DEFAULT_COSTCO_UPDATE_MINUTES
+        )
         super().__init__(
             hass,
             logger=logging.getLogger(__name__),
-            name="nsw_fuel_costco",
+            name="nsw_fuel_favorite_station",
             update_interval=timedelta(minutes=interval),
         )
         self.api = api
         self.entry = entry
 
     async def _async_update_data(self) -> Dict[str, Any]:
-        station_code = self.entry.data.get(CONF_COSTCO_STATION_CODE, "")
+        station_code = self.entry.data.get(CONF_FAVORITE_STATION_CODE) or self.entry.data.get(
+            CONF_COSTCO_STATION_CODE, ""
+        )
         if not station_code:
             return {}
         preferred_fuels = set(_split_pipe(self.entry.data[CONF_PREFERRED_FUELS]))
@@ -193,19 +202,21 @@ async def async_setup_entry(
         base_url="https://api.onegov.nsw.gov.au",
         api_key=entry.data[CONF_API_KEY],
         api_secret=entry.data[CONF_API_SECRET],
-        authorization=entry.data.get(CONF_AUTHORIZATION),
     )
 
     nearby_coordinator = NearbyCoordinator(hass, entry, api)
-    costco_coordinator = CostcoCoordinator(hass, entry, api)
+    favorite_coordinator = FavoriteStationCoordinator(hass, entry, api)
 
     await nearby_coordinator.async_config_entry_first_refresh()
-    if entry.data.get(CONF_COSTCO_STATION_CODE):
-        await costco_coordinator.async_config_entry_first_refresh()
+    favorite_station = entry.data.get(CONF_FAVORITE_STATION_CODE) or entry.data.get(
+        CONF_COSTCO_STATION_CODE, ""
+    )
+    if favorite_station:
+        await favorite_coordinator.async_config_entry_first_refresh()
 
     hass.data[DOMAIN][entry.entry_id]["coordinators"] = [
         nearby_coordinator,
-        costco_coordinator,
+        favorite_coordinator,
     ]
 
     entities: List[SensorEntity] = []
@@ -213,8 +224,8 @@ async def async_setup_entry(
     for entity_id in _split_commas(entry.data.get(CONF_PERSON_ENTITIES, "")):
         entities.append(NswFuelNearbySensor(nearby_coordinator, entity_id, entity_id))
 
-    if entry.data.get(CONF_COSTCO_STATION_CODE):
-        entities.append(NswFuelCostcoSensor(costco_coordinator))
+    if favorite_station:
+        entities.append(NswFuelFavoriteStationSensor(favorite_coordinator))
 
     async_add_entities(entities)
 
@@ -250,14 +261,14 @@ class NswFuelNearbySensor(CoordinatorEntity, SensorEntity):
         }
 
 
-class NswFuelCostcoSensor(CoordinatorEntity, SensorEntity):
+class NswFuelFavoriteStationSensor(CoordinatorEntity, SensorEntity):
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
-    def __init__(self, coordinator: CostcoCoordinator) -> None:
+    def __init__(self, coordinator: FavoriteStationCoordinator) -> None:
         super().__init__(coordinator)
-        self._attr_name = "Costco Fuel"
-        self._attr_unique_id = f"{DOMAIN}_costco"
+        self._attr_name = "Favorite Station Fuel"
+        self._attr_unique_id = f"{DOMAIN}_favorite_station"
 
     @property
     def native_value(self) -> Optional[float]:
