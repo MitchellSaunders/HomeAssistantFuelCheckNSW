@@ -23,7 +23,7 @@ from .const import (
     DEFAULT_BRANDS,
     DEFAULT_PREFERRED_FUELS,
     DEFAULT_NEARBY_UPDATE_MINUTES,
-    DEFAULT_COSTCO_UPDATE_MINUTES,
+    DEFAULT_FAVORITE_UPDATE_MINUTES,
     DOMAIN,
 )
 
@@ -107,7 +107,7 @@ class NswFuelConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     selector.NumberSelectorConfig(min=5, max=360, step=5, mode="box")
                 ),
                 vol.Optional(
-                    CONF_FAVORITE_UPDATE_MINUTES, default=DEFAULT_COSTCO_UPDATE_MINUTES
+                    CONF_FAVORITE_UPDATE_MINUTES, default=DEFAULT_FAVORITE_UPDATE_MINUTES
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(min=60, max=1440, step=60, mode="box")
                 ),

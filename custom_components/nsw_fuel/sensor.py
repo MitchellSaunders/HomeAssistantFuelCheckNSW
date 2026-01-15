@@ -23,13 +23,11 @@ from .const import (
     CONF_BRANDS,
     CONF_PREFERRED_FUELS,
     CONF_PERSON_ENTITIES,
-    CONF_COSTCO_STATION_CODE,
     CONF_FAVORITE_STATION_CODE,
     CONF_NEARBY_UPDATE_MINUTES,
-    CONF_COSTCO_UPDATE_MINUTES,
     CONF_FAVORITE_UPDATE_MINUTES,
     DEFAULT_NEARBY_UPDATE_MINUTES,
-    DEFAULT_COSTCO_UPDATE_MINUTES,
+    DEFAULT_FAVORITE_UPDATE_MINUTES,
     DOMAIN,
 )
 
@@ -159,9 +157,7 @@ class NearbyCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
 
 class FavoriteStationCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, api: NswFuelApi) -> None:
-        interval = entry.data.get(CONF_FAVORITE_UPDATE_MINUTES) or entry.data.get(
-            CONF_COSTCO_UPDATE_MINUTES, DEFAULT_COSTCO_UPDATE_MINUTES
-        )
+        interval = entry.data.get(CONF_FAVORITE_UPDATE_MINUTES, DEFAULT_FAVORITE_UPDATE_MINUTES)
         super().__init__(
             hass,
             logger=logging.getLogger(__name__),
@@ -172,9 +168,7 @@ class FavoriteStationCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
         self.entry = entry
 
     async def _async_update_data(self) -> Dict[str, Any]:
-        station_code = self.entry.data.get(CONF_FAVORITE_STATION_CODE) or self.entry.data.get(
-            CONF_COSTCO_STATION_CODE, ""
-        )
+        station_code = self.entry.data.get(CONF_FAVORITE_STATION_CODE, "")
         if not station_code:
             return {}
         preferred_fuels = set(_split_pipe(self.entry.data[CONF_PREFERRED_FUELS]))
@@ -208,9 +202,7 @@ async def async_setup_entry(
     favorite_coordinator = FavoriteStationCoordinator(hass, entry, api)
 
     await nearby_coordinator.async_config_entry_first_refresh()
-    favorite_station = entry.data.get(CONF_FAVORITE_STATION_CODE) or entry.data.get(
-        CONF_COSTCO_STATION_CODE, ""
-    )
+    favorite_station = entry.data.get(CONF_FAVORITE_STATION_CODE, "")
     if favorite_station:
         await favorite_coordinator.async_config_entry_first_refresh()
 
