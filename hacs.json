@@ -1,6 +1,6 @@
 {
   "name": "NSW Fuel Prices",
-  "content_in_root": true,
+  "content_in_root": false,
   "domains": ["sensor"],
   "iot_class": "cloud_polling",
   "render_readme": true
