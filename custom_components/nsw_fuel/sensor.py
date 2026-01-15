@@ -22,9 +22,11 @@ async def async_setup_entry(
     entities: List[SensorEntity] = []
     entities.append(NswFuelNearbySensor(nearby_coordinator, "home", "Home Cheapest Fuel"))
     for idx, entity_id in enumerate(_split_commas(entry.data.get(CONF_PERSON_ENTITIES, "")), start=1):
+        state = hass.states.get(entity_id)
+        label = state.name if state else f"User {idx}"
         entities.append(
             NswFuelNearbySensor(
-                nearby_coordinator, entity_id, f"User {idx} Nearby Cheapest Fuel"
+                nearby_coordinator, entity_id, f"{label} Nearby Cheapest Fuel"
             )
         )
 
@@ -54,17 +56,19 @@ class NswFuelNearbySensor(CoordinatorEntity, SensorEntity):
     def extra_state_attributes(self) -> Dict[str, Any]:
         data = self.coordinator.data.get(self._key, {})
         best = data.get("best") or {}
-        return {
+        attrs = {
             "fueltype": best.get("fueltype"),
             "brand": best.get("brand"),
             "stationcode": best.get("stationcode"),
             "station_name": best.get("name"),
             "address": best.get("address"),
             "distance": best.get("distance"),
-            "distance_to_home_cheapest": data.get("distance_to_home_cheapest"),
             "last_checked": data.get("last_checked"),
             "last_changed": best.get("lastupdated"),
         }
+        if self._key != "home":
+            attrs["distance_to_home_cheapest"] = data.get("distance_to_home_cheapest")
+        return attrs
 
 
 class NswFuelFavouriteStationSensor(CoordinatorEntity, SensorEntity):
