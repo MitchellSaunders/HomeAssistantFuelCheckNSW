@@ -20,10 +20,12 @@ async def async_setup_entry(
     favorite_coordinator = coordinators["favorite"]
 
     entities: List[SensorEntity] = []
-    entities.append(NswFuelNearbySensor(nearby_coordinator, "home", "Home Cheapest"))
+    entities.append(NswFuelNearbySensor(nearby_coordinator, "home", "Home Cheapest Fuel"))
     for idx, entity_id in enumerate(_split_commas(entry.data.get(CONF_PERSON_ENTITIES, "")), start=1):
         entities.append(
-            NswFuelNearbySensor(nearby_coordinator, entity_id, f"User {idx} Nearby Cheapest")
+            NswFuelNearbySensor(
+                nearby_coordinator, entity_id, f"User {idx} Nearby Cheapest Fuel"
+            )
         )
 
     if entry.data.get(CONF_FAVORITE_STATION_CODE, ""):
@@ -34,6 +36,7 @@ async def async_setup_entry(
 
 class NswFuelNearbySensor(CoordinatorEntity, SensorEntity):
     _attr_has_entity_name = True
+    _attr_icon = "mdi:gas-station"
 
     def __init__(self, coordinator: NearbyCoordinator, key: str, name: str) -> None:
         super().__init__(coordinator)
@@ -66,6 +69,7 @@ class NswFuelNearbySensor(CoordinatorEntity, SensorEntity):
 class NswFuelFavoriteStationSensor(CoordinatorEntity, SensorEntity):
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:gas-station"
 
     def __init__(self, coordinator: FavoriteStationCoordinator) -> None:
         super().__init__(coordinator)
