@@ -1,0 +1,23 @@
+DOMAIN = "nsw_fuel"
+
+CONF_API_KEY = "api_key"
+CONF_API_SECRET = "api_secret"
+CONF_AUTHORIZATION = "authorization"
+CONF_HOME_NAMEDLOCATION = "home_namedlocation"
+CONF_HOME_LAT = "home_lat"
+CONF_HOME_LON = "home_lon"
+CONF_RADIUS_KM = "radius_km"
+CONF_BRANDS = "brands"
+CONF_PREFERRED_FUELS = "preferred_fuels"
+CONF_PERSON_ENTITIES = "person_entities"
+CONF_COSTCO_STATION_CODE = "costco_station_code"
+CONF_NEARBY_UPDATE_MINUTES = "nearby_update_minutes"
+CONF_COSTCO_UPDATE_MINUTES = "costco_update_minutes"
+
+DEFAULT_RADIUS_KM = "10"
+DEFAULT_BRANDS = ""
+DEFAULT_PREFERRED_FUELS = "E10|U91|P95|P98"
+DEFAULT_NEARBY_UPDATE_MINUTES = 60
+DEFAULT_COSTCO_UPDATE_MINUTES = 360
+
+SERVICE_REFRESH = "refresh"

@@ -1,0 +1,85 @@
+1: https://api.onegov.nsw.gov.au/oauth/client_credential/accesstoken
+import requests
+
+url = "https://api.onegov.nsw.gov.au/oauth/client_credential/accesstoken"
+
+querystring = {"grant_type":"<SOME_STRING_VALUE>"}
+
+headers = {
+    'content-type': "application/json",
+    'authorization': "<SOME_STRING_VALUE>"
+    }
+
+response = requests.request("GET", url, headers=headers, params=querystring)
+
+print(response.text)
+
+
+2: https://api.onegov.nsw.gov.au/FuelCheckRefData/v1/fuel/lovs
+import requests
+
+url = "https://api.onegov.nsw.gov.au/FuelCheckRefData/v1/fuel/lovs"
+
+headers = {
+    'content-type': "<SOME_STRING_VALUE>",
+    'authorization': "<SOME_STRING_VALUE>",
+    'apikey': "<SOME_STRING_VALUE>",
+    'transactionid': "<SOME_STRING_VALUE>",
+    'requesttimestamp': "<SOME_STRING_VALUE>",
+    'if-modified-since': "<SOME_STRING_VALUE>"
+    }
+
+response = requests.request("GET", url, headers=headers)
+
+print(response.text)
+
+3: https://api.onegov.nsw.gov.au/FuelPriceCheck/v1/fuel/prices/nearby
+import requests
+
+url = "https://api.onegov.nsw.gov.au/FuelPriceCheck/v1/fuel/prices/nearby"
+
+payload = "{\"fueltype\":\"\",\"brand\":[],\"namedlocation\":\"\",\"latitude\":\"\",\"longitude\":\"\",\"radius\":\"\",\"sortby\":\"\",\"sortascending\":\"\"}"
+headers = {
+    'authorization': "<SOME_STRING_VALUE>",
+    'apikey': "<SOME_STRING_VALUE>",
+    'transactionid': "<SOME_STRING_VALUE>",
+    'requesttimestamp': "<SOME_STRING_VALUE>"
+    }
+
+response = requests.request("POST", url, data=payload, headers=headers)
+
+print(response.text)
+
+4: https://api.onegov.nsw.gov.au/FuelPriceCheck/v1/fuel/prices/station/{stationCode}
+import requests
+
+url = "https://api.onegov.nsw.gov.au/FuelPriceCheck/v1/fuel/prices/station/%7BstationCode%7D"
+
+headers = {
+    'content-type': "<SOME_STRING_VALUE>",
+    'authorization': "<SOME_STRING_VALUE>",
+    'apikey': "<SOME_STRING_VALUE>",
+    'transactionid': "<SOME_STRING_VALUE>",
+    'requesttimestamp': "<SOME_STRING_VALUE>"
+    }
+
+response = requests.request("GET", url, headers=headers)
+
+print(response.text)
+
+5: https://api.onegov.nsw.gov.au/FuelPriceCheck/v1/fuel/prices
+import requests
+
+url = "https://api.onegov.nsw.gov.au/FuelPriceCheck/v1/fuel/prices"
+
+headers = {
+    'content-type': "<SOME_STRING_VALUE>",
+    'authorization': "<SOME_STRING_VALUE>",
+    'apikey': "<SOME_STRING_VALUE>",
+    'transactionid': "<SOME_STRING_VALUE>",
+    'requesttimestamp': "<SOME_STRING_VALUE>"
+    }
+
+response = requests.request("GET", url, headers=headers)
+
+print(response.text)

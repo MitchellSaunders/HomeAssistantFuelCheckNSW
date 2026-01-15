@@ -1,0 +1,3 @@
+refresh:
+  name: Refresh fuel data
+  description: Fetch the latest NSW fuel prices for all configured sensors.

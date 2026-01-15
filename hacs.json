@@ -1,0 +1,7 @@
+{
+  "name": "NSW Fuel Prices",
+  "content_in_root": true,
+  "domains": ["sensor"],
+  "iot_class": "cloud_polling",
+  "render_readme": true
+}
