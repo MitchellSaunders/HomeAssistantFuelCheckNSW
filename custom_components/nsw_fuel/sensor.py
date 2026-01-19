@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
@@ -50,6 +50,8 @@ async def async_setup_entry(
 class NswFuelNearbySensor(CoordinatorEntity, SensorEntity):
     _attr_has_entity_name = True
     _attr_icon = "mdi:gas-station"
+    _attr_native_unit_of_measurement = "c/L"
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: NearbyCoordinator, key: str, name: str) -> None:
         super().__init__(coordinator)
@@ -87,6 +89,8 @@ class NswFuelFavouriteStationSensor(CoordinatorEntity, SensorEntity):
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:gas-station"
+    _attr_native_unit_of_measurement = "c/L"
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator: FavouriteStationCoordinator) -> None:
         super().__init__(coordinator)

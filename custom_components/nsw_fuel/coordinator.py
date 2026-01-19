@@ -41,6 +41,17 @@ def _split_commas(value: Any) -> List[str]:
     return [v.strip() for v in str(value).split(",") if v.strip()]
 
 
+def _to_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
 def _get_entity_location(hass: HomeAssistant, entity_id: str) -> Optional[Dict[str, str]]:
     state = hass.states.get(entity_id)
     if not state:
@@ -82,11 +93,12 @@ def _join_station_prices(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
         code = str(price.get("stationcode"))
         station = stations.get(code, {})
         location = station.get("location") or {}
+        price_value = _to_float(price.get("price"))
         joined.append(
             {
                 "stationcode": code,
                 "fueltype": price.get("fueltype"),
-                "price": price.get("price"),
+                "price": price_value,
                 "lastupdated": price.get("lastupdated"),
                 "brand": station.get("brand"),
                 "name": station.get("name"),
@@ -239,9 +251,16 @@ class FavouriteStationCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
         except Exception as err:
             _LOGGER.error("Favourite station request failed (%s): %s", station_code, err)
             raise UpdateFailed(f"Favourite station request failed: {err}") from err
-        prices = [
-            p for p in payload.get("prices", []) if p.get("fueltype") in preferred_fuels
-        ]
+        prices = []
+        for entry in payload.get("prices", []):
+            if entry.get("fueltype") not in preferred_fuels:
+                continue
+            price_value = _to_float(entry.get("price"))
+            if price_value is None:
+                continue
+            cleaned = dict(entry)
+            cleaned["price"] = price_value
+            prices.append(cleaned)
         prices.sort(key=lambda p: p.get("price"))
         best = prices[0] if prices else None
         return {
