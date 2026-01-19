@@ -12,6 +12,17 @@ from .const import CONF_FAVOURITE_STATION_CODE, CONF_PERSON_ENTITIES, DOMAIN
 from .coordinator import FavouriteStationCoordinator, NearbyCoordinator, _split_commas
 
 
+def _to_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
 async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities
 ) -> None:
@@ -50,7 +61,8 @@ class NswFuelNearbySensor(CoordinatorEntity, SensorEntity):
     def native_value(self) -> Optional[float]:
         data = self.coordinator.data.get(self._key, {})
         best = data.get("best")
-        return best.get("price") if best else None
+        price = best.get("price") if best else None
+        return _to_float(price)
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
@@ -84,7 +96,7 @@ class NswFuelFavouriteStationSensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self) -> Optional[float]:
         best = self.coordinator.data.get("best") or {}
-        return best.get("price")
+        return _to_float(best.get("price"))
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
