@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.event import async_track_state_change
+from homeassistant.helpers.event import async_track_state_change_event
 
 from .api import NswFuelApi
 from .const import (
@@ -57,13 +57,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if e.strip()
     ]
     if person_entities:
-        def _schedule_refresh(entity_id, old_state, new_state):
-            if new_state is None:
+        @callback
+        def _schedule_refresh(event) -> None:
+            if event.data.get("new_state") is None:
                 return
             hass.async_create_task(nearby_coordinator.async_request_refresh())
 
         for entity_id in person_entities:
-            unsub = async_track_state_change(hass, entity_id, _schedule_refresh)
+            unsub = async_track_state_change_event(hass, entity_id, _schedule_refresh)
             hass.data[DOMAIN][entry.entry_id]["unsub"].append(unsub)
 
     async def _handle_refresh(call) -> None:
