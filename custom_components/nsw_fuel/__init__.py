@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -66,6 +67,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         for entity_id in person_entities:
             unsub = async_track_state_change_event(hass, entity_id, _schedule_refresh)
             hass.data[DOMAIN][entry.entry_id]["unsub"].append(unsub)
+
+        @callback
+        def _refresh_on_start(_event) -> None:
+            hass.async_create_task(nearby_coordinator.async_request_refresh())
+
+        if hass.is_running:
+            hass.async_create_task(nearby_coordinator.async_request_refresh())
+        else:
+            hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _refresh_on_start)
 
     async def _handle_refresh(call) -> None:
         coordinators = hass.data[DOMAIN][entry.entry_id].get("coordinators", {})
