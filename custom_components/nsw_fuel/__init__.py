@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import logging
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.event import async_track_state_change_event
 
 from .api import NswFuelApi
 from .const import (
@@ -20,6 +20,7 @@ from .const import (
 from .coordinator import FavouriteStationCoordinator, NearbyCoordinator
 
 PLATFORMS = ["sensor"]
+_LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -39,43 +40,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     nearby_coordinator = NearbyCoordinator(hass, entry, api)
     favourite_coordinator = FavouriteStationCoordinator(hass, entry, api)
 
-    try:
-        await nearby_coordinator.async_config_entry_first_refresh()
-        if entry.data.get(CONF_FAVOURITE_STATION_CODE, ""):
-            await favourite_coordinator.async_config_entry_first_refresh()
-    except Exception as exc:
-        raise ConfigEntryNotReady from exc
-
     hass.data[DOMAIN][entry.entry_id]["coordinators"] = {
         "nearby": nearby_coordinator,
         "favourite": favourite_coordinator,
     }
     hass.data[DOMAIN][entry.entry_id]["unsub"] = []
 
-    person_entities = [
-        e.strip()
-        for e in entry.data.get(CONF_PERSON_ENTITIES, "").split(",")
-        if e.strip()
-    ]
-    if person_entities:
-        @callback
-        def _schedule_refresh(event) -> None:
-            if event.data.get("new_state") is None:
-                return
-            hass.async_create_task(nearby_coordinator.async_request_refresh())
+    # Person entities are still used to compute locations during each scheduled refresh.
+    # We intentionally do not refresh on every state change to avoid spamming the API.
+    async def _initial_refresh() -> None:
+        try:
+            await nearby_coordinator.async_config_entry_first_refresh()
+            if entry.data.get(CONF_FAVOURITE_STATION_CODE, ""):
+                await favourite_coordinator.async_config_entry_first_refresh()
+        except Exception as exc:
+            _LOGGER.warning("Initial refresh failed: %s", exc)
 
-        for entity_id in person_entities:
-            unsub = async_track_state_change_event(hass, entity_id, _schedule_refresh)
-            hass.data[DOMAIN][entry.entry_id]["unsub"].append(unsub)
+    @callback
+    def _refresh_on_start(_event) -> None:
+        hass.async_create_task(_initial_refresh())
 
-        @callback
-        def _refresh_on_start(_event) -> None:
-            hass.async_create_task(nearby_coordinator.async_request_refresh())
-
-        if hass.is_running:
-            hass.async_create_task(nearby_coordinator.async_request_refresh())
-        else:
-            hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _refresh_on_start)
+    if hass.is_running:
+        hass.async_create_task(_initial_refresh())
+    else:
+        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _refresh_on_start)
 
     async def _handle_refresh(call) -> None:
         coordinators = hass.data[DOMAIN][entry.entry_id].get("coordinators", {})
