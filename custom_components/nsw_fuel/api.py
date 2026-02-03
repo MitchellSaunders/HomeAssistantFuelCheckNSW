@@ -5,7 +5,7 @@ import json
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Awaitable, Callable, Dict, Optional
 
 from aiohttp import ClientSession
 from aiohttp.client_exceptions import ContentTypeError
@@ -18,6 +18,7 @@ class NswFuelApi:
         base_url: str,
         api_key: str,
         api_secret: str,
+        on_api_call: Optional[Callable[[int], Awaitable[None]]] = None,
     ) -> None:
         self._session = session
         self._base_url = base_url.rstrip("/")
@@ -25,6 +26,11 @@ class NswFuelApi:
         self._api_secret = api_secret
         self._token: Optional[str] = None
         self._token_expiry: Optional[float] = None
+        self._on_api_call = on_api_call
+
+    async def _count_call(self) -> None:
+        if self._on_api_call:
+            await self._on_api_call(1)
 
     def _basic_auth_header(self) -> str:
         raw = f"{self._api_key}:{self._api_secret}".encode("utf-8")
@@ -35,6 +41,7 @@ class NswFuelApi:
         url = f"{self._base_url}/oauth/client_credential/accesstoken"
         headers = {"Authorization": self._basic_auth_header(), "Accept": "application/json"}
         params = {"grant_type": "client_credentials"}
+        await self._count_call()
         async with self._session.get(url, headers=headers, params=params) as resp:
             resp.raise_for_status()
             try:
@@ -97,6 +104,7 @@ class NswFuelApi:
             "sortascending": sortascending,
         }
         headers = await self._headers()
+        await self._count_call()
         async with self._session.post(url, headers=headers, json=payload) as resp:
             text = await resp.text()
             if resp.status >= 400:
@@ -108,6 +116,7 @@ class NswFuelApi:
     async def get_station_prices(self, station_code: str) -> Dict[str, Any]:
         url = f"{self._base_url}/FuelPriceCheck/v1/fuel/prices/station/{station_code}"
         headers = await self._headers()
+        await self._count_call()
         async with self._session.get(url, headers=headers) as resp:
             text = await resp.text()
             if resp.status >= 400:

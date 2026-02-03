@@ -3,8 +3,10 @@ from __future__ import annotations
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import EVENT_HOMEASSISTANT_STARTED
-from homeassistant.core import HomeAssistant, callback
+from datetime import time as dt_time
+
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.event import async_track_time_change
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import entity_registry as er
 
@@ -17,7 +19,7 @@ from .const import (
     DOMAIN,
     SERVICE_REFRESH,
 )
-from .coordinator import FavouriteStationCoordinator, NearbyCoordinator
+from .coordinator import ApiCallCounter, FavouriteStationCoordinator, NearbyCoordinator
 
 PLATFORMS = ["sensor"]
 _LOGGER = logging.getLogger(__name__)
@@ -29,12 +31,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     _migrate_entity_ids(hass, entry)
 
+    api_calls = ApiCallCounter(hass, entry)
+    hass.data[DOMAIN][entry.entry_id]["api_calls"] = api_calls
+
     session = async_get_clientsession(hass)
     api = NswFuelApi(
         session=session,
         base_url="https://api.onegov.nsw.gov.au",
         api_key=entry.data[CONF_API_KEY],
         api_secret=entry.data[CONF_API_SECRET],
+        on_api_call=api_calls.async_increment,
     )
 
     nearby_coordinator = NearbyCoordinator(hass, entry, api)
@@ -46,24 +52,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
     hass.data[DOMAIN][entry.entry_id]["unsub"] = []
 
-    # Person entities are still used to compute locations during each scheduled refresh.
-    # We intentionally do not refresh on every state change to avoid spamming the API.
-    async def _initial_refresh() -> None:
-        try:
-            await nearby_coordinator.async_config_entry_first_refresh()
-            if entry.data.get(CONF_FAVOURITE_STATION_CODE, ""):
-                await favourite_coordinator.async_config_entry_first_refresh()
-        except Exception as exc:
-            _LOGGER.warning("Initial refresh failed: %s", exc)
+    await nearby_coordinator.async_config_entry_first_refresh()
+    if entry.data.get(CONF_FAVOURITE_STATION_CODE, ""):
+        await favourite_coordinator.async_config_entry_first_refresh()
 
-    @callback
-    def _refresh_on_start(_event) -> None:
-        hass.async_create_task(_initial_refresh())
+    def _reset_api_calls(_now) -> None:
+        hass.async_create_task(api_calls.async_reset_if_new_day(force=True))
 
-    if hass.is_running:
-        hass.async_create_task(_initial_refresh())
-    else:
-        hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, _refresh_on_start)
+    reset_unsub = async_track_time_change(hass, _reset_api_calls, hour=0, minute=0, second=0)
+    hass.data[DOMAIN][entry.entry_id]["unsub"].append(reset_unsub)
 
     async def _handle_refresh(call) -> None:
         coordinators = hass.data[DOMAIN][entry.entry_id].get("coordinators", {})

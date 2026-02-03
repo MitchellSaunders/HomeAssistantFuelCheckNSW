@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
+from typing import Awaitable, Callable
 from typing import Any, Dict, List, Optional
 
 from homeassistant.config_entries import ConfigEntry
@@ -128,6 +129,39 @@ def _pick_cheapest(records: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         return None
     records.sort(key=lambda r: r.get("price"))
     return records[0]
+
+
+class ApiCallCounter(DataUpdateCoordinator[Dict[str, Any]]):
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        super().__init__(hass, logger=_LOGGER, name="nsw_fuel_api_calls", update_interval=None)
+        today = dt_util.now().date().isoformat()
+        self.entry = entry
+        self.data = {
+            "date": today,
+            "count": 0,
+            "last_reset": dt_util.now().isoformat(),
+        }
+
+    async def async_increment(self, amount: int = 1) -> None:
+        await self.async_reset_if_new_day()
+        current = int(self.data.get("count", 0))
+        self.async_set_updated_data(
+            {
+                **self.data,
+                "count": current + max(0, int(amount)),
+            }
+        )
+
+    async def async_reset_if_new_day(self, force: bool = False) -> None:
+        today = dt_util.now().date().isoformat()
+        if force or self.data.get("date") != today:
+            self.async_set_updated_data(
+                {
+                    "date": today,
+                    "count": 0,
+                    "last_reset": dt_util.now().isoformat(),
+                }
+            )
 
 
 class NearbyCoordinator(DataUpdateCoordinator[Dict[str, Any]]):

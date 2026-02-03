@@ -9,7 +9,7 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_FAVOURITE_STATION_CODE, CONF_PERSON_ENTITIES, DOMAIN
-from .coordinator import FavouriteStationCoordinator, NearbyCoordinator, _split_commas
+from .coordinator import ApiCallCounter, FavouriteStationCoordinator, NearbyCoordinator, _split_commas
 
 
 def _to_float(value: Any) -> Optional[float]:
@@ -29,6 +29,7 @@ async def async_setup_entry(
     coordinators = hass.data[DOMAIN][entry.entry_id]["coordinators"]
     nearby_coordinator = coordinators["nearby"]
     favourite_coordinator = coordinators["favourite"]
+    api_calls = hass.data[DOMAIN][entry.entry_id]["api_calls"]
 
     entities: List[SensorEntity] = []
     entities.append(NswFuelNearbySensor(nearby_coordinator, "home", "Home Cheapest Fuel"))
@@ -43,6 +44,7 @@ async def async_setup_entry(
 
     if entry.data.get(CONF_FAVOURITE_STATION_CODE, ""):
         entities.append(NswFuelFavouriteStationSensor(favourite_coordinator))
+    entities.append(NswFuelApiCallsSensor(api_calls))
 
     async_add_entities(entities)
 
@@ -61,14 +63,14 @@ class NswFuelNearbySensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self) -> Optional[float]:
-        data = self.coordinator.data.get(self._key, {})
+        data = (self.coordinator.data or {}).get(self._key, {})
         best = data.get("best")
         price = best.get("price") if best else None
         return _to_float(price)
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
-        data = self.coordinator.data.get(self._key, {})
+        data = (self.coordinator.data or {}).get(self._key, {})
         best = data.get("best") or {}
         attrs = {
             "fueltype": best.get("fueltype"),
@@ -99,12 +101,12 @@ class NswFuelFavouriteStationSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def native_value(self) -> Optional[float]:
-        best = self.coordinator.data.get("best") or {}
+        best = (self.coordinator.data or {}).get("best") or {}
         return _to_float(best.get("price"))
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
-        data = self.coordinator.data
+        data = self.coordinator.data or {}
         best = data.get("best") or {}
         return {
             "station_code": data.get("station_code"),
@@ -112,4 +114,28 @@ class NswFuelFavouriteStationSensor(CoordinatorEntity, SensorEntity):
             "last_checked": data.get("last_checked"),
             "last_changed": best.get("lastupdated"),
             "prices": data.get("prices", []),
+        }
+
+
+class NswFuelApiCallsSensor(CoordinatorEntity, SensorEntity):
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_icon = "mdi:counter"
+    _attr_native_unit_of_measurement = "calls"
+
+    def __init__(self, coordinator: ApiCallCounter) -> None:
+        super().__init__(coordinator)
+        self._attr_name = "API Calls Used Today"
+        self._attr_unique_id = f"{DOMAIN}_api_calls_today"
+
+    @property
+    def native_value(self) -> Optional[int]:
+        return int((self.coordinator.data or {}).get("count", 0))
+
+    @property
+    def extra_state_attributes(self) -> Dict[str, Any]:
+        data = self.coordinator.data or {}
+        return {
+            "date": data.get("date"),
+            "last_reset": data.get("last_reset"),
         }
