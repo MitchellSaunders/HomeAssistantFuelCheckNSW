@@ -6,6 +6,7 @@ from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import EntityCategory
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_FAVOURITE_STATION_CODE, CONF_PERSON_ENTITIES, DOMAIN
@@ -49,7 +50,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class NswFuelNearbySensor(CoordinatorEntity, SensorEntity):
+class NswFuelNearbySensor(CoordinatorEntity, SensorEntity, RestoreEntity):
     _attr_has_entity_name = True
     _attr_icon = "mdi:gas-station"
     _attr_native_unit_of_measurement = "c/L"
@@ -60,10 +61,24 @@ class NswFuelNearbySensor(CoordinatorEntity, SensorEntity):
         self._key = key
         self._attr_name = name
         self._attr_unique_id = f"{DOMAIN}_{key}_nearby"
+        self._restored_native_value: Optional[float] = None
+        self._restored_attrs: Dict[str, Any] = {}
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (self.coordinator.data or {}).get(self._key):
+            return
+        last_state = await self.async_get_last_state()
+        if last_state is None:
+            return
+        self._restored_native_value = _to_float(last_state.state)
+        self._restored_attrs = dict(last_state.attributes)
 
     @property
     def native_value(self) -> Optional[float]:
         data = (self.coordinator.data or {}).get(self._key, {})
+        if not data:
+            return self._restored_native_value
         best = data.get("best")
         price = best.get("price") if best else None
         return _to_float(price)
@@ -71,6 +86,22 @@ class NswFuelNearbySensor(CoordinatorEntity, SensorEntity):
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         data = (self.coordinator.data or {}).get(self._key, {})
+        if not data:
+            if self._restored_attrs:
+                return self._restored_attrs
+            attrs = {
+                "fueltype": None,
+                "brand": None,
+                "stationcode": None,
+                "station_name": None,
+                "address": None,
+                "distance": None,
+                "last_checked": None,
+                "last_changed": None,
+            }
+            if self._key != "home":
+                attrs["distance_to_home_cheapest"] = None
+            return attrs
         best = data.get("best") or {}
         attrs = {
             "fueltype": best.get("fueltype"),
@@ -87,7 +118,7 @@ class NswFuelNearbySensor(CoordinatorEntity, SensorEntity):
         return attrs
 
 
-class NswFuelFavouriteStationSensor(CoordinatorEntity, SensorEntity):
+class NswFuelFavouriteStationSensor(CoordinatorEntity, SensorEntity, RestoreEntity):
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_icon = "mdi:gas-station"
@@ -98,15 +129,40 @@ class NswFuelFavouriteStationSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._attr_name = "Favourite Station Fuel"
         self._attr_unique_id = f"{DOMAIN}_favourite_station"
+        self._restored_native_value: Optional[float] = None
+        self._restored_attrs: Dict[str, Any] = {}
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if self.coordinator.data:
+            return
+        last_state = await self.async_get_last_state()
+        if last_state is None:
+            return
+        self._restored_native_value = _to_float(last_state.state)
+        self._restored_attrs = dict(last_state.attributes)
 
     @property
     def native_value(self) -> Optional[float]:
-        best = (self.coordinator.data or {}).get("best") or {}
+        data = self.coordinator.data or {}
+        if not data:
+            return self._restored_native_value
+        best = data.get("best") or {}
         return _to_float(best.get("price"))
 
     @property
     def extra_state_attributes(self) -> Dict[str, Any]:
         data = self.coordinator.data or {}
+        if not data:
+            if self._restored_attrs:
+                return self._restored_attrs
+            return {
+                "station_code": None,
+                "fueltype": None,
+                "last_checked": None,
+                "last_changed": None,
+                "prices": [],
+            }
         best = data.get("best") or {}
         return {
             "station_code": data.get("station_code"),

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
 from typing import Awaitable, Callable
 from typing import Any, Dict, List, Optional
 
@@ -15,16 +14,12 @@ from .api import NswFuelApi
 from .const import (
     CONF_BRANDS,
     CONF_FAVOURITE_STATION_CODE,
-    CONF_FAVOURITE_UPDATE_MINUTES,
     CONF_HOME_LAT,
     CONF_HOME_LON,
     CONF_HOME_NAMEDLOCATION,
-    CONF_NEARBY_UPDATE_MINUTES,
     CONF_PERSON_ENTITIES,
     CONF_PREFERRED_FUELS,
     CONF_RADIUS_KM,
-    DEFAULT_FAVOURITE_UPDATE_MINUTES,
-    DEFAULT_NEARBY_UPDATE_MINUTES,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -166,12 +161,11 @@ class ApiCallCounter(DataUpdateCoordinator[Dict[str, Any]]):
 
 class NearbyCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, api: NswFuelApi) -> None:
-        interval = entry.data.get(CONF_NEARBY_UPDATE_MINUTES, DEFAULT_NEARBY_UPDATE_MINUTES)
         super().__init__(
             hass,
             logger=_LOGGER,
             name="nsw_fuel_nearby",
-            update_interval=timedelta(minutes=interval),
+            update_interval=None,
         )
         self.api = api
         self.entry = entry
@@ -199,21 +193,35 @@ class NearbyCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
         results: Dict[str, Any] = {}
         home_best_coords: Optional[Dict[str, float]] = None
         checked_at = dt_util.utcnow().isoformat()
+        request_cache: Dict[tuple[str, str, str, str, str, tuple[str, ...]], Dict[str, Any]] = {}
+        max_queries = len(locations) * len(preferred_fuels)
 
         for loc_id, loc in locations.items():
             best: Optional[Dict[str, Any]] = None
             for fuel in preferred_fuels:
+                effective_namedlocation = loc.get("postal") or namedlocation
+                query_key = (
+                    fuel,
+                    loc["lat"],
+                    loc["lon"],
+                    effective_namedlocation,
+                    radius_km,
+                    tuple(brands),
+                )
                 try:
-                    payload = await self.api.get_prices_nearby(
-                        fueltype=fuel,
-                        brands=brands,
-                        namedlocation=loc.get("postal") or namedlocation,
-                        latitude=loc["lat"],
-                        longitude=loc["lon"],
-                        radius_km=radius_km,
-                        sortby="price",
-                        sortascending="true",
-                    )
+                    payload = request_cache.get(query_key)
+                    if payload is None:
+                        payload = await self.api.get_prices_nearby(
+                            fueltype=fuel,
+                            brands=brands,
+                            namedlocation=effective_namedlocation,
+                            latitude=loc["lat"],
+                            longitude=loc["lon"],
+                            radius_km=radius_km,
+                            sortby="price",
+                            sortascending="true",
+                        )
+                        request_cache[query_key] = payload
                 except Exception as err:
                     _LOGGER.error("Nearby request failed for %s (%s): %s", loc_id, fuel, err)
                     raise UpdateFailed(f"Nearby request failed: {err}") from err
@@ -258,17 +266,24 @@ class NearbyCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
                 except (TypeError, ValueError):
                     dist = None
                 results[loc_id]["distance_to_home_cheapest"] = dist
+
+        _LOGGER.debug(
+            "Nearby cycle unique requests=%s (worst-case=%s, locations=%s, preferred_fuels=%s)",
+            len(request_cache),
+            max_queries,
+            len(locations),
+            len(preferred_fuels),
+        )
         return results
 
 
 class FavouriteStationCoordinator(DataUpdateCoordinator[Dict[str, Any]]):
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry, api: NswFuelApi) -> None:
-        interval = entry.data.get(CONF_FAVOURITE_UPDATE_MINUTES, DEFAULT_FAVOURITE_UPDATE_MINUTES)
         super().__init__(
             hass,
             logger=_LOGGER,
             name="nsw_fuel_favourite_station",
-            update_interval=timedelta(minutes=interval),
+            update_interval=None,
         )
         self.api = api
         self.entry = entry

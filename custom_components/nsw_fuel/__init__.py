@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from homeassistant.config_entries import ConfigEntry
-from datetime import time as dt_time
-
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.event import async_track_time_change
+from homeassistant.core import ServiceCall
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import entity_registry as er
 
@@ -14,7 +14,6 @@ from .api import NswFuelApi
 from .const import (
     CONF_API_KEY,
     CONF_API_SECRET,
-    CONF_FAVOURITE_STATION_CODE,
     CONF_PERSON_ENTITIES,
     DOMAIN,
     SERVICE_REFRESH,
@@ -23,6 +22,43 @@ from .coordinator import ApiCallCounter, FavouriteStationCoordinator, NearbyCoor
 
 PLATFORMS = ["sensor"]
 _LOGGER = logging.getLogger(__name__)
+
+
+async def _async_handle_refresh(hass: HomeAssistant, call: ServiceCall) -> None:
+    """Refresh all NSW fuel coordinators across all config entries."""
+    del call
+    entry_map = hass.data.get(DOMAIN, {})
+    contexts: list[tuple[str, str, str]] = []
+    coros = []
+    for entry_id, entry_data in entry_map.items():
+        for coordinator_name, coordinator in entry_data.get("coordinators", {}).items():
+            coros.append(coordinator.async_request_refresh())
+            contexts.append((entry_id, coordinator_name, coordinator.name))
+    if not coros:
+        _LOGGER.debug("Manual refresh requested with no active coordinators.")
+        return
+    results = await asyncio.gather(*coros, return_exceptions=True)
+    failures: list[tuple[str, str, str, Exception]] = []
+    for (entry_id, coordinator_name, coordinator_label), result in zip(contexts, results):
+        if not isinstance(result, Exception):
+            continue
+        failures.append((entry_id, coordinator_name, coordinator_label, result))
+        _LOGGER.error(
+            "Manual refresh failed for entry_id=%s coordinator=%s label=%s error=%s",
+            entry_id,
+            coordinator_name,
+            coordinator_label,
+            result,
+            exc_info=(type(result), result, result.__traceback__),
+        )
+    if failures:
+        summary = ", ".join(
+            f"{entry_id}:{coordinator_name}:{type(err).__name__}"
+            for entry_id, coordinator_name, _coordinator_label, err in failures
+        )
+        raise HomeAssistantError(
+            f"NSW fuel refresh completed with {len(failures)} failure(s): {summary}"
+        )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -52,23 +88,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     }
     hass.data[DOMAIN][entry.entry_id]["unsub"] = []
 
-    await nearby_coordinator.async_config_entry_first_refresh()
-    if entry.data.get(CONF_FAVOURITE_STATION_CODE, ""):
-        await favourite_coordinator.async_config_entry_first_refresh()
+    if not hass.services.has_service(DOMAIN, SERVICE_REFRESH):
+        async def _handle_refresh(call: ServiceCall) -> None:
+            await _async_handle_refresh(hass, call)
 
-    def _reset_api_calls(_now) -> None:
-        hass.async_create_task(api_calls.async_reset_if_new_day(force=True))
-
-    reset_unsub = async_track_time_change(hass, _reset_api_calls, hour=0, minute=0, second=0)
-    hass.data[DOMAIN][entry.entry_id]["unsub"].append(reset_unsub)
-
-    async def _handle_refresh(call) -> None:
-        coordinators = hass.data[DOMAIN][entry.entry_id].get("coordinators", {})
-        for coordinator in coordinators.values():
-            await coordinator.async_request_refresh()
-
-    if SERVICE_REFRESH not in hass.services.async_services().get(DOMAIN, {}):
-        hass.services.async_register(DOMAIN, SERVICE_REFRESH, _handle_refresh)
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_REFRESH,
+            _handle_refresh,
+        )
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
@@ -77,9 +105,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        for unsub in hass.data[DOMAIN][entry.entry_id].get("unsub", []):
+        for unsub in hass.data[DOMAIN].get(entry.entry_id, {}).get("unsub", []):
             unsub()
         hass.data[DOMAIN].pop(entry.entry_id, None)
+        if not hass.data[DOMAIN] and hass.services.has_service(DOMAIN, SERVICE_REFRESH):
+            hass.services.async_remove(DOMAIN, SERVICE_REFRESH)
     return unload_ok
 
 

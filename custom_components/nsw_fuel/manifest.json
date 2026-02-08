@@ -1,11 +1,11 @@
 {
   "domain": "nsw_fuel",
   "name": "NSW Fuel Prices",
-  "version": "0.1.0",
-  "documentation": "https://github.com/yourname/nsw-fuel-ha",
-  "issue_tracker": "https://github.com/yourname/nsw-fuel-ha/issues",
+  "version": "0.1.1",
+  "documentation": "https://github.com/MitchellSaunders/HomeAssistantFuelCheckNSW",
+  "issue_tracker": "https://github.com/MitchellSaunders/HomeAssistantFuelCheckNSW/issues",
   "requirements": [],
-  "codeowners": ["@yourname"],
+  "codeowners": ["@MitchellSaunders"],
   "config_flow": true,
   "iot_class": "cloud_polling"
 }

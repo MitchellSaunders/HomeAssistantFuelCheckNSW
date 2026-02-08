@@ -44,22 +44,36 @@ def main() -> None:
     if not namedlocation or not latitude or not longitude:
         raise SystemExit("Missing NSW_FUEL_API_NAMEDLOCATION or NSW_FUEL_API_LAT/LON.")
 
-    payload = client.get_prices_nearby_v1(
-        fueltype=fueltype,
-        brands=brands,
-        namedlocation=namedlocation,
-        latitude=latitude,
-        longitude=longitude,
-        radius_km=radius_km,
-        sortby=sortby,
-        sortascending=sortascending,
-    )
     preferred = os.environ.get("NSW_FUEL_API_PREFERRED_FUELS", "E10|U91|P95|P98")
     preferred_list = [f for f in preferred.split("|") if f]
     limit = int(os.environ.get("NSW_FUEL_API_RESULTS_LIMIT", "10"))
+    query_fuels = preferred_list if preferred_list else [fueltype]
 
-    joined = join_station_prices(payload)
-    cheapest = filter_cheapest_fuels(joined, preferred_list, limit=limit)
+    merged_payload = {"stations": [], "prices": []}
+    seen_station_codes: set[str] = set()
+
+    for query_fuel in query_fuels:
+        payload = client.get_prices_nearby_v1(
+            fueltype=query_fuel,
+            brands=brands,
+            namedlocation=namedlocation,
+            latitude=latitude,
+            longitude=longitude,
+            radius_km=radius_km,
+            sortby=sortby,
+            sortascending=sortascending,
+        )
+        for station in payload.get("stations", []):
+            code = str(station.get("code"))
+            if code in seen_station_codes:
+                continue
+            seen_station_codes.add(code)
+            merged_payload["stations"].append(station)
+        merged_payload["prices"].extend(payload.get("prices", []))
+
+    joined = join_station_prices(merged_payload)
+    filter_fuels = preferred_list if preferred_list else [fueltype]
+    cheapest = filter_cheapest_fuels(joined, filter_fuels, limit=limit)
     print(f"Retrieved {len(joined)} prices; showing {len(cheapest)} cheapest.")
     for item in cheapest:
         print(

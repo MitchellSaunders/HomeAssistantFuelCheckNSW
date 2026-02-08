@@ -17,13 +17,9 @@ from .const import (
     CONF_PREFERRED_FUELS,
     CONF_PERSON_ENTITIES,
     CONF_FAVOURITE_STATION_CODE,
-    CONF_NEARBY_UPDATE_MINUTES,
-    CONF_FAVOURITE_UPDATE_MINUTES,
     DEFAULT_RADIUS_KM,
     DEFAULT_BRANDS,
     DEFAULT_PREFERRED_FUELS,
-    DEFAULT_NEARBY_UPDATE_MINUTES,
-    DEFAULT_FAVOURITE_UPDATE_MINUTES,
     DOMAIN,
 )
 
@@ -94,22 +90,12 @@ class NswFuelConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ),
                 vol.Optional(CONF_PERSON_ENTITIES, default=[]): selector.EntitySelector(
                     selector.EntitySelectorConfig(
-                        domain="sensor",
+                        domain=["person", "device_tracker", "sensor"],
                         multiple=True,
                     )
                 ),
                 vol.Optional(CONF_FAVOURITE_STATION_CODE, default=""): selector.TextSelector(
                     selector.TextSelectorConfig()
-                ),
-                vol.Optional(
-                    CONF_NEARBY_UPDATE_MINUTES, default=DEFAULT_NEARBY_UPDATE_MINUTES
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=5, max=360, step=5, mode="box")
-                ),
-                vol.Optional(
-                    CONF_FAVOURITE_UPDATE_MINUTES, default=DEFAULT_FAVOURITE_UPDATE_MINUTES
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(min=60, max=1440, step=60, mode="box")
                 ),
             }
         )
