@@ -9,7 +9,15 @@
       "location": {
         "title": "Locations and preferences",
         "description": "Set your home location, optional people sensors, and fuel preferences."
+      },
+      "reconfigure": {
+        "title": "Reconfigure NSW Fuel",
+        "description": "Update credentials, location, and fuel preferences."
       }
+    },
+    "abort": {
+      "reconfigure_successful": "Configuration updated successfully.",
+      "reconfigure_failed": "Unable to reconfigure this entry."
     }
   }
 }

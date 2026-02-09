@@ -27,6 +27,7 @@ After install:
 2. Add the integration via Settings -> Devices & Services -> Add Integration -> "NSW Fuel Prices".
 3. Fill in API credentials, home location, and your location entities (person, device_tracker, or sensor).
 4. Use the `nsw_fuel.refresh` service to refresh on demand or from automations.
+5. Use the integration's Reconfigure action in the UI any time you need to update credentials or fuel/location settings.
 
 Nearby and favourite fuel sensors are not refreshed automatically. They update only when you call `nsw_fuel.refresh` (manually or via your own automation), and their last known values are restored after Home Assistant restarts.
 
